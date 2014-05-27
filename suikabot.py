@@ -10,24 +10,6 @@ from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol, ssl
 from twisted.internet.endpoints import TCP4ClientEndpoint, SSL4ClientEndpoint, connectProtocol
 
-# global plugin list TODO: move this into the bot class
-plugins = {}
-
-def load_plugins (plugin_dir):
-    plugin_files = os.listdir(plugin_dir)
-    suffixes = [x[0] for x in imp.get_suffixes()]
-
-    for plugin_file in plugin_files:
-        name, suffix = os.path.splitext(plugin_file)
-        if suffix not in suffixes:
-            continue
-
-        try:
-            mod = imp.load_source('suikabot.plugin.{0}'.format(name), os.path.join(plugin_dir, plugin_file))
-            plugins[plugin_file] = mod
-        except Exception as e:
-            logging.error("Couldn't load module {0}! {1}".format(plugin_file, e))
-
 class SuikaBot(irc.IRCClient):
     '''
         main bot class
@@ -35,14 +17,37 @@ class SuikaBot(irc.IRCClient):
         also sends Twisted's convenience events (as irc_*)
     '''
 
+    def __init__ (self):
+        self.plugins = {}
+        self.plugin_dir = '.'
+
+    def load_plugins (self):
+        plugin_files = os.listdir(self.plugin_dir)
+        suffixes = [x[0] for x in imp.get_suffixes()]
+
+        for plugin_file in plugin_files:
+            name, suffix = os.path.splitext(plugin_file)
+            if suffix not in suffixes:
+                continue
+
+            try:
+                mod = imp.load_source('suikabot.plugin.{0}'.format(name), os.path.join(self.plugin_dir, plugin_file))
+                self.plugins[name] = mod
+            except Exception as e:
+                logging.error("Couldn't load module {0}! {1}".format(plugin_file, e))
+
+    def reload_plugins (self):
+        self.plugins = {}
+        self.load_plugins()
+
     def dispatch_to_plugins (self, handler, *args):
-        for plugin in plugins.viewvalues():
+        for plugin in self.plugins.viewvalues():
             # call the handler
             if hasattr(plugin, handler):
                 getattr(plugin, handler)(self, *args)
 
     def handleCommand (self, command, prefix, params):
-        handler = 'raw_{0}'.format(command)
+        handler = 'raw_{0}'.format(command.lower())
         self.dispatch_to_plugins(handler, prefix, params)
 
         print "{0}: {1} ({2})".format(command, prefix, params)
@@ -98,13 +103,13 @@ class SuikaBot(irc.IRCClient):
         self.dispatch_to_plugins('irc_quit', *args)
 
 def main ():
-    load_plugins('plugins')
-   
     servaddr, servport = sys.argv[2].split(':')
 
     client = SuikaBot()
     client.nickname = sys.argv[1] 
     client.password = sys.argv[3]
+    client.plugin_dir = 'plugins'
+    client.load_plugins()
 
     connectProtocol(SSL4ClientEndpoint(reactor, servaddr, int(servport), ssl.ClientContextFactory()), client)
     

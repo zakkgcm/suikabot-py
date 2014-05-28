@@ -2,8 +2,13 @@
 
 import os
 import sys
-import re
 import imp
+
+import re
+import json
+import errno
+
+import appdirs
 import ssl
 import logging
 
@@ -21,19 +26,20 @@ class AccessList:
     LEVEL_OP = 10
 
     def __init__ (self):
-        self.accessmap = {}
+        self.access_map = {}
 
-    def add (mask, level):
-        self.accessmap[mask] = level
+    def add (self, mask, level):
+        self.access_map[mask] = level
 
-    def del (mask):
-        if mask in self.accessmap:
-            del accessmap[mask]
+    def delete (self, mask):
+        if mask in self.access_map:
+            del self.access_map[mask]
 
-    def check (mask, level):
+    def check (self, mask, level):
         '''Return if a given mask has at least the specified permissions.'''
-        if mask in self.accessmap:
-            return ircmask_match(self.accessmap[mask], mask)
+        for p, l in self.access_map.viewitems():
+            if ircmask_match(p, mask):
+                return l >= level
 
 class SuikaBot(irc.IRCClient):
     '''
@@ -45,7 +51,7 @@ class SuikaBot(irc.IRCClient):
     def __init__ (self):
         self.plugins = {}
         self.plugin_dir = '.'
-        self.accesslist = AccessList()
+        self.access_list = AccessList()
 
     def load_plugins (self):
         plugin_files = os.listdir(self.plugin_dir)
@@ -129,17 +135,37 @@ class SuikaBot(irc.IRCClient):
         self.dispatch_to_plugins('irc_quit', *args)
 
 def main ():
+    # config directories
+    config_dir = appdirs.user_config_dir('suikabot')
+    access_file = os.path.join(config_dir, 'accesslist.json.conf')
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as e:
+        if e.errno != errno.EEXIST and not os.path.isdir(e.filename):
+            raise
+
+    # set up the client
     servaddr, servport = sys.argv[2].split(':')
 
     client = SuikaBot()
     client.nickname = sys.argv[1] 
     client.password = sys.argv[3]
+
+    with open(access_file, 'r') as f:
+        client.access_list.access_map = json.load(f)
+
     client.plugin_dir = 'plugins'
     client.load_plugins()
 
     connectProtocol(SSL4ClientEndpoint(reactor, servaddr, int(servport), ssl.ClientContextFactory()), client)
-    
+   
+    # main loop
     reactor.run()
+
+    # save access list to file
+    with open(access_file, 'w+') as f:
+        json.dump(client.access_list.access_map, f)
 
 if __name__ == "__main__":
     main()

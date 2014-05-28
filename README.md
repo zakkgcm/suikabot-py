@@ -5,4 +5,5 @@ drunk oni irc robot
 * plugin based
 
 ## Dependencies
+* appdirs
 * Twisted with SSL support

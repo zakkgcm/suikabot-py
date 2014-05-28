@@ -2,6 +2,7 @@
 
 import os
 import sys
+import re
 import imp
 import ssl
 import logging
@@ -9,6 +10,30 @@ import logging
 from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol, ssl
 from twisted.internet.endpoints import TCP4ClientEndpoint, SSL4ClientEndpoint, connectProtocol
+
+def ircmask_match (pattern, mask):
+    '''Match an irc-style mask against a wildcard pattern.'''
+    pattern = re.escape(pattern).replace('\\*', '.+')
+    return re.match(pattern, mask) != None
+
+class AccessList:
+    LEVEL_OWNER = 100
+    LEVEL_OP = 10
+
+    def __init__ (self):
+        self.accessmap = {}
+
+    def add (mask, level):
+        self.accessmap[mask] = level
+
+    def del (mask):
+        if mask in self.accessmap:
+            del accessmap[mask]
+
+    def check (mask, level):
+        '''Return if a given mask has at least the specified permissions.'''
+        if mask in self.accessmap:
+            return ircmask_match(self.accessmap[mask], mask)
 
 class SuikaBot(irc.IRCClient):
     '''
@@ -20,6 +45,7 @@ class SuikaBot(irc.IRCClient):
     def __init__ (self):
         self.plugins = {}
         self.plugin_dir = '.'
+        self.accesslist = AccessList()
 
     def load_plugins (self):
         plugin_files = os.listdir(self.plugin_dir)

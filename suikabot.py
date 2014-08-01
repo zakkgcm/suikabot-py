@@ -142,6 +142,9 @@ class SuikaBot(irc.IRCClient):
 
         irc.IRCClient.handleCommand(self, command, prefix, params)
 
+    def schedule (self, delay, callback, *args):
+        reactor.callLater(delay, callback, *args)
+
     # the rest of these are convenience methods inherited from Twisted
     # each is forwarded to plugins
     # some may have internal tracking logic

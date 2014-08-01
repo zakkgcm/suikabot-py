@@ -8,6 +8,9 @@ import re
 import json
 import errno
 
+import threading
+import pickle
+
 import appdirs
 import ssl
 import logging
@@ -15,11 +18,52 @@ import logging
 from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol, ssl
 from twisted.internet.endpoints import TCP4ClientEndpoint, SSL4ClientEndpoint, connectProtocol
+from Queue import Queue
 
 def ircmask_match (pattern, mask):
     '''Match an irc-style mask against a wildcard pattern.'''
     pattern = re.escape(pattern).replace('\\*', '.+')
     return re.match(pattern, mask) != None
+
+def mkdir(dirname):
+    try:
+        os.makedirs(dirname)
+    except OSError as e:
+        if e.errno != errno.EEXIST and not os.path.isdir(e.filename):
+            raise
+
+class DataWriter():
+    '''Threaded pickle data writing subsystem. Assumes small, infrequent writes'''
+    def __init__ (self, data_dir='.'):
+        self.data_dir = data_dir
+        self.thread = threading.Thread(target=self.run)
+        self.queue = Queue()
+
+        self.thread.daemon = True
+        self.thread.start()
+
+    def add (self, fname, data):
+        '''Queue the given data to be written to a file'''
+        self.queue.put((fname, data))
+
+    def get(self, fname):
+        '''Get the data from the given file'''
+        try:
+            with open(os.path.join(self.data_dir, fname), 'rb') as f:
+                data = pickle.load(f)
+                return data
+        except IOError:
+            logging.warning("Tried to load nonexistant data file {0}", fname)
+
+        return []
+
+    def run (self):
+        while True:
+            mkdir(self.data_dir)
+
+            fname, data = self.queue.get()
+            with open(os.path.join(self.data_dir, fname), 'wb') as f:
+                pickle.dump(data, f) 
 
 class AccessList:
     LEVEL_OWNER = 100
@@ -37,9 +81,12 @@ class AccessList:
 
     def check (self, mask, level):
         '''Return if a given mask has at least the specified permissions.'''
+
         for p, l in self.access_map.viewitems():
             if ircmask_match(p, mask):
                 return l >= level
+
+        return True
 
 class SuikaBot(irc.IRCClient):
     '''
@@ -52,21 +99,30 @@ class SuikaBot(irc.IRCClient):
         self.plugins = {}
         self.plugin_dir = '.'
         self.access_list = AccessList()
-
+        self.data_writer = DataWriter(appdirs.user_data_dir('suikabot'))
+        
     def load_plugins (self):
         plugin_files = os.listdir(self.plugin_dir)
-        suffixes = [x[0] for x in imp.get_suffixes()]
+        #suffixes = [x[0] for x in imp.get_suffixes()]
+        suffixes = ['.py']
 
         for plugin_file in plugin_files:
             name, suffix = os.path.splitext(plugin_file)
             if suffix not in suffixes:
                 continue
-
             try:
                 mod = imp.load_source('suikabot.plugin.{0}'.format(name), os.path.join(self.plugin_dir, plugin_file))
                 self.plugins[name] = mod
-            except Exception as e:
+
+                mod.init(self)               
+ 
+                logging.info("Loaded module {0} from {1}".format(name, self.plugin_dir))
+            except ImportError as e:
                 logging.error("Couldn't load module {0}! {1}".format(plugin_file, e))
+            except AttributeError:
+                logging.warning("No init defined for module {0}".format(name)) # FIXME: handle just the init error
+
+        print self.plugins
 
     def reload_plugins (self):
         self.plugins = {}
@@ -139,11 +195,7 @@ def main ():
     config_dir = appdirs.user_config_dir('suikabot')
     access_file = os.path.join(config_dir, 'accesslist.json.conf')
 
-    try:
-        os.makedirs(config_dir)
-    except OSError as e:
-        if e.errno != errno.EEXIST and not os.path.isdir(e.filename):
-            raise
+    mkdir(config_dir)
 
     # set up the client
     servaddr, servport = sys.argv[2].split(':')

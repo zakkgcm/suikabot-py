@@ -34,7 +34,10 @@ def irc_public (client, hostmask, channel, message):
 
         remindmsg = remindmsg.strip()
         t = target.lower()
-        
+       
+        if t == "me":
+            t = nick.lower()
+
         dtime, _, _, _, _ = pdt.nlp(dmsg)[0] # first matched date-like object
         remindtime = time.mktime(dtime.timetuple())
         #remindmsg = (msg[:spos] + msg[epos:]).strip()

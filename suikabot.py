@@ -15,6 +15,8 @@ import appdirs
 import ssl
 import logging
 
+from modules import util
+
 from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol, ssl
 from twisted.internet.endpoints import TCP4ClientEndpoint, SSL4ClientEndpoint, connectProtocol
@@ -32,7 +34,7 @@ def mkdir(dirname):
         if e.errno != errno.EEXIST and not os.path.isdir(e.filename):
             raise
 
-class DataWriter():
+class DataWriter:
     '''Threaded pickle data writing subsystem. Assumes small, infrequent writes'''
     def __init__ (self, data_dir='.'):
         self.data_dir = data_dir
@@ -88,20 +90,12 @@ class AccessList:
 
         return True
 
-class SuikaBot(irc.IRCClient):
-    '''
-        main bot class
-        sends ALL events to loaded plugins (as raw_*)
-        also sends Twisted's convenience events (as irc_*)
-    '''
-
-    def __init__ (self):
+class PluginLoader:
+    def __init__ (self, plugin_dir='.'):
         self.plugins = {}
-        self.plugin_dir = '.'
-        self.access_list = AccessList()
-        self.data_writer = DataWriter(appdirs.user_data_dir('suikabot'))
-        
-    def load_plugins (self):
+        self.plugin_dir = plugin_dir
+
+    def load (self):
         plugin_files = os.listdir(self.plugin_dir)
         #suffixes = [x[0] for x in imp.get_suffixes()]
         suffixes = ['.py']
@@ -122,14 +116,27 @@ class SuikaBot(irc.IRCClient):
             except AttributeError:
                 logging.warning("No init defined for module {0}".format(name)) # FIXME: handle just the init error
 
-        print self.plugins
-
-    def reload_plugins (self):
+    def reload (self):
         self.plugins = {}
-        self.load_plugins()
+        self.load()
+
+    def get (self):
+        return self.plugins
+
+class SuikaClient(irc.IRCClient):
+    '''
+        main bot class
+        sends ALL events to loaded plugins (as raw_*)
+        also sends Twisted's convenience events (as irc_*)
+    '''
+
+    def __init__ (self):
+        self.access_list = None
+        self.data_writer = None
+        self.plugins = None
 
     def dispatch_to_plugins (self, handler, *args):
-        for plugin in self.plugins.viewvalues():
+        for plugin in self.plugins.get().viewvalues():
             # call the handler
             if hasattr(plugin, handler):
                 getattr(plugin, handler)(self, *args)
@@ -193,34 +200,59 @@ class SuikaBot(irc.IRCClient):
     def userQuit (self, *args):
         self.dispatch_to_plugins('irc_quit', *args)
 
+def connect_client (address, port=6667, password='', nickname='', username=None, realname=None, **kwargs):
+    client = SuikaClient()
+    client.nickname = nickname
+    client.username = username
+    client.realname = realname
+    client.password = password
+
+    connectProtocol(SSL4ClientEndpoint(reactor, address, port, ssl.ClientContextFactory()), client)
+
+    return client
+
 def main ():
-    # config directories
-    config_dir = appdirs.user_config_dir('suikabot')
-    access_file = os.path.join(config_dir, 'accesslist.json.conf')
+    # client list
+    clients = {}
 
-    mkdir(config_dir)
+    # configuration files
+    configuration = util.Config('suikabot')
+    #userinfo = configuration.load('userinfo')
+    #serverlist = configuration.load('servers')
 
-    # set up the client
-    servaddr, servport = sys.argv[2].split(':')
+    # services
+    access_list = AccessList()
+    access_list.access_map = configuration.load('accesslist')
 
-    client = SuikaBot()
-    client.nickname = sys.argv[1] 
-    client.password = sys.argv[3]
+    data_writer = DataWriter(appdirs.user_data_dir('suikabot'))
+    
+    plugins = PluginLoader('plugins')
+    plugins.load()
 
-    with open(access_file, 'r') as f:
-        client.access_list.access_map = json.load(f)
+    # FIXME: read these from config files
+    userinfo = {'nickname': sys.argv[1]}
 
-    client.plugin_dir = 'plugins'
-    client.load_plugins()
+    opts = {}
 
-    connectProtocol(SSL4ClientEndpoint(reactor, servaddr, int(servport), ssl.ClientContextFactory()), client)
-   
+    saddr, sport = sys.argv[2].split(':')
+    opts['address'] = saddr
+    opts['port'] = int(sport)
+    opts['password'] = sys.argv[3]
+    
+    opts.update(userinfo)
+    client = connect_client(**opts)
+
+    # dependency inject
+    client.access_list = access_list
+    client.data_writer = data_writer
+    client.plugins = plugins
+    clients[saddr] = client
+    
     # main loop
     reactor.run()
 
-    # save access list to file
-    with open(access_file, 'w+') as f:
-        json.dump(client.access_list.access_map, f)
+    # save config files
+    configuration.save('accesslist', access_list.access_map)
 
 if __name__ == "__main__":
     main()

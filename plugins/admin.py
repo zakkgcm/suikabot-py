@@ -15,5 +15,5 @@ def irc_public (client, user, channel, message):
                 client.leave(channel)
             
             if cmd == '!reload':
-                client.reload_plugins()
+                client.plugins.reload()
                 client.say(channel, 'Plugins Reloaded!')

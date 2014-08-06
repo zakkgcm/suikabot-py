@@ -216,8 +216,8 @@ def main ():
 
     # configuration files
     configuration = util.Config('suikabot')
-    #userinfo = configuration.load('userinfo')
-    #serverlist = configuration.load('servers')
+    userinfo = configuration.load('userinfo')
+    serverlist = configuration.load('servers')
 
     # services
     access_list = AccessList()
@@ -228,24 +228,16 @@ def main ():
     plugins = PluginLoader('plugins')
     plugins.load()
 
-    # FIXME: read these from config files
-    userinfo = {'nickname': sys.argv[1]}
+    for server, opts in serverlist.viewitems():
+        opts.update(userinfo)
+        client = connect_client(**opts)
 
-    opts = {}
+        # dependency inject
+        client.access_list = access_list
+        client.data_writer = data_writer
+        client.plugins = plugins
 
-    saddr, sport = sys.argv[2].split(':')
-    opts['address'] = saddr
-    opts['port'] = int(sport)
-    opts['password'] = sys.argv[3]
-    
-    opts.update(userinfo)
-    client = connect_client(**opts)
-
-    # dependency inject
-    client.access_list = access_list
-    client.data_writer = data_writer
-    client.plugins = plugins
-    clients[saddr] = client
+        clients[server] = client
 
     # cleanup callback
     def shutdown ():

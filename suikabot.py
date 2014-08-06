@@ -13,7 +13,6 @@ import pickle
 
 import appdirs
 import ssl
-import logging
 
 from modules import util
 
@@ -55,7 +54,7 @@ class DataWriter:
                 data = pickle.load(f)
                 return data
         except IOError:
-            logging.warning("Tried to load nonexistant data file {0}", fname)
+            util.logger.warning("Tried to load nonexistant data file {0}", fname)
 
         return []
 
@@ -110,11 +109,11 @@ class PluginLoader:
 
                 mod.init(self)               
  
-                logging.info("Loaded module {0} from {1}".format(name, self.plugin_dir))
+                util.logger.info("Loaded module {0} from {1}".format(name, self.plugin_dir))
             except ImportError as e:
-                logging.error("Couldn't load module {0}! {1}".format(plugin_file, e))
+                util.logger.error("Couldn't load module {0}! {1}".format(plugin_file, e))
             except AttributeError:
-                logging.warning("No init defined for module {0}".format(name)) # FIXME: handle just the init error
+                util.logger.warning("No init defined for module {0}".format(name)) # FIXME: handle just the init error
 
     def reload (self):
         self.plugins = {}
@@ -145,7 +144,7 @@ class SuikaClient(irc.IRCClient):
         handler = 'raw_{0}'.format(command.lower())
         self.dispatch_to_plugins(handler, prefix, params)
 
-        print "{0}: {1} ({2})".format(command, prefix, params)
+        util.logger.info("{0}: {1} ({2})".format(command, prefix, params))
 
         irc.IRCClient.handleCommand(self, command, prefix, params)
 
@@ -247,12 +246,18 @@ def main ():
     client.data_writer = data_writer
     client.plugins = plugins
     clients[saddr] = client
-    
+
+    # cleanup callback
+    def shutdown ():
+        util.logger.info("Shutting down...")
+        
+        # save config files
+        configuration.save('accesslist', access_list.access_map)
+        
+    reactor.addSystemEventTrigger('before', 'shutdown', shutdown)
+
     # main loop
     reactor.run()
-
-    # save config files
-    configuration.save('accesslist', access_list.access_map)
 
 if __name__ == "__main__":
     main()

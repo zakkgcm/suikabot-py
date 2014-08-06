@@ -1,11 +1,18 @@
 import os
 import re
+import sys
 
 import appdirs
 import errno
-import json
+import yaml
 import logging
 
+logger = logging.getLogger("suikabot")
+logger.setLevel(logging.INFO)
+
+shandle = logging.StreamHandler(sys.stdout)
+logger.addHandler(shandle)
+ 
 def mkdir(dirname):
     try:
         os.makedirs(dirname)
@@ -30,7 +37,7 @@ class Config:
         mkdir(config_dir)
 
     def format_config_name (self, config):
-        return os.path.join(self.config_dir, '{0}.json.conf'.format(config))
+        return os.path.join(self.config_dir, '{0}.conf'.format(config))
         
 
     def load (self, config):
@@ -38,9 +45,9 @@ class Config:
     
         try:
             with open(fname, 'r') as f:
-                return json.load(f)
+                return yaml.load(f)
         except IOError as e:
-            logging.error("Couldn't read config file {0}! {1}".format(fname, e))
+            logger.error("Couldn't read config file {0}! {1}".format(fname, e))
         
         return {}
 
@@ -49,6 +56,6 @@ class Config:
     
         try:
             with open(fname, 'w+') as f:
-                return json.dump(data, f)
+                return yaml.dump(data, f)
         except IOError as e:
-            logging.error("Couldn't write config file {0}! {1}".format(fname, e))
+            logger.error("Couldn't write config file {0}! {1}".format(fname, e))

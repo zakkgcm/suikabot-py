@@ -1,5 +1,7 @@
 import time
 import humanize
+
+from modules import util
 from collections import defaultdict
 
 class Laters (defaultdict):
@@ -30,22 +32,22 @@ laters = Laters(list)
 def init (client):
     laters.load(client)
 
-def irc_public (client, user, channel, message):
-    user, _ = user.split('!', 1)
+def irc_public (client, hostmask, channel, message):
+    nick, user, host = util.ircmask_split(hostmask)
 
     # check for saved laters first
-    if laters.has(user):
-        lats = laters.get(user)
+    if laters.has(nick):
+        lats = laters.get(nick)
         for l in lats:
             sender, msg, t = l
        
             t = time.time() - t
 
             client.say(channel, "{0}: Sent {1}: <{2}> {3}".format(
-                user, humanize.naturaltime(t), sender, msg
+                nick, humanize.naturaltime(t), sender, msg
             ))
 
-        laters.remove(user)
+        laters.remove(nick)
         laters.commit(client)
     
     # process commands
@@ -57,8 +59,8 @@ def irc_public (client, user, channel, message):
             if t in ['xpc', 'xpcybic', 'xpcynic', 'xpcyphone', 'xpcdroid']:
                 client.say(channel, "Shhh!!! You know xpc doesn't like that!")
             else:
-                if laters.limitcheck(target, user):
-                    laters.add(target, user, msg)
+                if laters.limitcheck(target, nick):
+                    laters.add(target, nick, msg)
                     client.say(channel, "Okay, I'll remind {0} later!".format(target))
                     laters.commit(client)
                 else:

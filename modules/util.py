@@ -25,7 +25,7 @@ def ircmask_match (pattern, mask):
     pattern = re.escape(pattern).replace('\\*', '.+')
     return re.match(pattern, mask) != None
 
-def split_user (hostmask):
+def ircmask_split (hostmask):
     nick, userhost = hostmask.split('!', 1)
     user, host = userhost.split('@', 1)
 

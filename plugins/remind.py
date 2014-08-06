@@ -3,7 +3,7 @@ import datetime
 import humanize
 import parsedatetime
 
-import modules.util as util
+from modules import util
 
 reminders = []
 pdt = parsedatetime.Calendar()
@@ -26,7 +26,7 @@ def schedule_reminder (client, reminder):
         client.schedule(reminddelta, client.say, channel, "{0}: <{1}> {2}".format(t, nick, remindmsg))
 
 def irc_public (client, hostmask, channel, message):
-    nick, user, host = util.split_user(hostmask)
+    nick, user, host = util.ircmask_split(hostmask)
     
     if message.startswith('!remind'):
         _, target, msg = message.split(' ', 2)

@@ -21,18 +21,6 @@ from twisted.internet import reactor, protocol, ssl
 from twisted.internet.endpoints import TCP4ClientEndpoint, SSL4ClientEndpoint, connectProtocol
 from Queue import Queue
 
-def ircmask_match (pattern, mask):
-    '''Match an irc-style mask against a wildcard pattern.'''
-    pattern = re.escape(pattern).replace('\\*', '.+')
-    return re.match(pattern, mask) != None
-
-def mkdir(dirname):
-    try:
-        os.makedirs(dirname)
-    except OSError as e:
-        if e.errno != errno.EEXIST and not os.path.isdir(e.filename):
-            raise
-
 class DataWriter:
     '''Threaded pickle data writing subsystem. Assumes small, infrequent writes'''
     def __init__ (self, data_dir='.'):
@@ -60,7 +48,7 @@ class DataWriter:
 
     def run (self):
         while True:
-            mkdir(self.data_dir)
+            util.mkdir(self.data_dir)
 
             fname, data = self.queue.get()
             with open(os.path.join(self.data_dir, fname), 'wb') as f:
@@ -84,7 +72,7 @@ class AccessList:
         '''Return if a given mask has at least the specified permissions.'''
 
         for p, l in self.access_map.viewitems():
-            if ircmask_match(p, mask):
+            if util.ircmask_match(p, mask):
                 return l >= level
 
         return True
@@ -144,7 +132,7 @@ class SuikaClient(irc.IRCClient):
         handler = 'raw_{0}'.format(command.lower())
         self.dispatch_to_plugins(handler, prefix, params)
 
-        util.logger.info("{0}: {1} ({2})".format(command, prefix, params))
+        util.logger.debug("{0}: {1} ({2})".format(command, prefix, params))
 
         irc.IRCClient.handleCommand(self, command, prefix, params)
 

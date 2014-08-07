@@ -20,17 +20,17 @@ class Laters (defaultdict):
     def limitcheck (self, target, user):
         return len([l for l in self.get(target) if l[0].lower() == user.lower()]) < 3
 
-    def load (self, client):
+    def load (self):
         self.clear()
-        self.update(client.data_writer.get('laters.db'))
+        self.update(data_writer.get('laters.db'))
 
-    def commit (self, client):
-        client.data_writer.add('laters.db', dict(self))
+    def commit (self):
+        data_writer.add('laters.db', dict(self))
         
 laters = Laters(list)
 
-def init (client):
-    laters.load(client)
+def client_connected (client):
+    laters.load()
 
 def irc_public (client, hostmask, channel, message):
     nick, user, host = util.ircmask_split(hostmask)
@@ -48,7 +48,7 @@ def irc_public (client, hostmask, channel, message):
             ))
 
         laters.remove(nick)
-        laters.commit(client)
+        laters.commit()
     
     # process commands
     if message.startswith('!later'):
@@ -62,6 +62,6 @@ def irc_public (client, hostmask, channel, message):
                 if laters.limitcheck(target, nick):
                     laters.add(target, nick, msg)
                     client.say(channel, "Okay, I'll remind {0} later!".format(target))
-                    laters.commit(client)
+                    laters.commit()
                 else:
                     client.say(channel, "You already left {0} too many reminders!".format(target))

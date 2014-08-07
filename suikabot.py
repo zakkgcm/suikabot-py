@@ -81,6 +81,7 @@ class PluginLoader:
     def __init__ (self, plugin_dir='.'):
         self.plugins = {}
         self.plugin_dir = plugin_dir
+        self.data_writer = None
 
     def load (self):
         plugin_files = os.listdir(self.plugin_dir)
@@ -95,7 +96,8 @@ class PluginLoader:
                 mod = imp.load_source('suikabot.plugin.{0}'.format(name), os.path.join(self.plugin_dir, plugin_file))
                 self.plugins[name] = mod
 
-                mod.init(self)               
+                mod.data_writer = self.data_writer # FIXME: magic global variable is ugly
+                mod.init()
  
                 util.logger.info("Loaded module {0} from {1}".format(name, self.plugin_dir))
             except ImportError as e:
@@ -117,10 +119,12 @@ class SuikaClient(irc.IRCClient):
         also sends Twisted's convenience events (as irc_*)
     '''
 
-    def __init__ (self):
+    def __init__ (self, server):
+        self.server = server
         self.access_list = None
-        self.data_writer = None
         self.plugins = None
+
+        self.lineRate = 1
 
     def dispatch_to_plugins (self, handler, *args):
         for plugin in self.plugins.get().viewvalues():
@@ -138,6 +142,9 @@ class SuikaClient(irc.IRCClient):
 
     def schedule (self, delay, callback, *args):
         reactor.callLater(delay, callback, *args)
+
+    def connectionMade(self):
+        self.dispatch_to_plugins("client_connected")
 
     # the rest of these are convenience methods inherited from Twisted
     # each is forwarded to plugins
@@ -187,8 +194,8 @@ class SuikaClient(irc.IRCClient):
     def userQuit (self, *args):
         self.dispatch_to_plugins('irc_quit', *args)
 
-def connect_client (address, port=6667, password='', nickname='', username=None, realname=None, **kwargs):
-    client = SuikaClient()
+def connect_client (server, address, port=6667, password='', nickname='', username=None, realname=None, **kwargs):
+    client = SuikaClient(server)
     client.nickname = nickname
     client.username = username
     client.realname = realname
@@ -212,17 +219,17 @@ def main ():
     access_list.access_map = configuration.load('accesslist')
 
     data_writer = DataWriter(appdirs.user_data_dir('suikabot'))
-    
+
     plugins = PluginLoader('plugins')
+    plugins.data_writer = data_writer
     plugins.load()
 
     for server, opts in serverlist.viewitems():
         opts.update(userinfo)
-        client = connect_client(**opts)
+        client = connect_client(server, **opts)
 
         # dependency inject
         client.access_list = access_list
-        client.data_writer = data_writer
         client.plugins = plugins
 
         clients[server] = client

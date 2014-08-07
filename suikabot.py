@@ -144,7 +144,10 @@ class SuikaClient(irc.IRCClient):
         reactor.callLater(delay, callback, *args)
 
     def connectionMade(self):
+        util.logger.info("Connected to server {0}.".format(self.server))
         self.dispatch_to_plugins("client_connected")
+
+        irc.IRCClient.connectionMade(self)
 
     # the rest of these are convenience methods inherited from Twisted
     # each is forwarded to plugins

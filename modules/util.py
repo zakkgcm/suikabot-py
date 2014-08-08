@@ -22,7 +22,7 @@ def mkdir(dirname):
 
 def ircmask_match (pattern, mask):
     '''Match an irc-style mask against a wildcard pattern.'''
-    pattern = re.escape(pattern).replace('\\*', '.+')
+    pattern = re.escape(pattern).replace('\\*', '.*')
     return re.match(pattern, mask) != None
 
 def ircmask_split (hostmask):

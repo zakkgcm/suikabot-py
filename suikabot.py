@@ -75,7 +75,7 @@ class AccessList:
             if util.ircmask_match(p, mask):
                 return l >= level
 
-        return True
+        return False
 
 class PluginLoader:
     def __init__ (self, plugin_dir='.'):

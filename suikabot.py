@@ -17,7 +17,9 @@ import ssl
 from modules import util
 
 from twisted.words.protocols import irc
-from twisted.internet import reactor, protocol, ssl
+from twisted.internet import reactor, protocol
+from twisted.internet.ssl import ClientContextFactory as SSLClientContextFactory
+from twisted.internet.protocol import ReconnectingClientFactory
 from twisted.internet.endpoints import TCP4ClientEndpoint, SSL4ClientEndpoint, connectProtocol
 from Queue import Queue
 
@@ -197,19 +199,49 @@ class SuikaClient(irc.IRCClient):
     def userQuit (self, *args):
         self.dispatch_to_plugins('irc_quit', *args)
 
-def connect_client (server, address, port=6667, password='', nickname='', username=None, realname=None, **kwargs):
-    client = SuikaClient(server)
-    client.nickname = nickname
-    client.username = username
-    client.realname = realname
-    client.password = password
+class SuikaClientFactory(ReconnectingClientFactory):
+    def set_info(self, server, nickname='dumb_bot', username='', realname='', server_password=''):
+        self.server = server
+        self.userinfo = (nickname, username, realname)
+        self.server_password = server_password
 
-    connectProtocol(SSL4ClientEndpoint(reactor, address, port, ssl.ClientContextFactory()), client)
+    def buildProtocol (self, addr):
+        client = SuikaClient(self.server)
+        client.nickname = self.userinfo[0]
+        client.username = self.userinfo[1]
+        client.realname = self.userinfo[2]
+        client.password = self.server_password
 
-    return client
+        # FIXME: refactor this as a "service" kind of design
+        client.access_list = self.access_list
+        client.plugins = self.plugins
+
+        # required(?) by the api
+        client.factory = self
+        
+        return client
+
+    def clientConnectionLost (self, connector, reason):
+        util.logger.warning("Lost connection.  ({0})".format(reason.getErrorMessage()))
+        ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
+
+    def clientConnectionFailed (self, connector, reason):
+        util.logger.warning("Connection failed.  ({0})".format(reason.getErrorMessage()))
+        ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
+
+def connect_client (server, address, port=6667, password=None, nickname='', username=None, realname=None, ssl=False, **kwargs):
+    factory = SuikaClientFactory()
+    factory.set_info(server, nickname, username, realname, password)
+
+    if ssl:
+        reactor.connectSSL(address, port, factory, SSLClientContextFactory())
+    else:
+        reactor.connectTCP(address, port, factory)
+
+    return factory
 
 def main ():
-    # client list
+    # client list (actually clientfactories)
     clients = {}
 
     # configuration files
@@ -229,13 +261,13 @@ def main ():
 
     for server, opts in serverlist.viewitems():
         opts.update(userinfo)
-        client = connect_client(server, **opts)
+        factory = connect_client(server, **opts)
 
         # dependency inject
-        client.access_list = access_list
-        client.plugins = plugins
+        factory.access_list = access_list
+        factory.plugins = plugins
 
-        clients[server] = client
+        clients[server] = factory
 
     # cleanup callback
     def shutdown ():

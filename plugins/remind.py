@@ -25,7 +25,9 @@ def schedule_reminder (client, reminder):
 
     if reminddelta > 0:
         reminders[client.server].append(reminder)
-        client.schedule(reminddelta, client.say, channel, "{0}: <{1}> {2}".format(t, nick, remindmsg))
+        client.schedule(reminddelta, client.say, channel, "{0}: Sent {1}: <{2}> {3}".format(
+            t, humanize.naturaltime(reminddelta), nick, remindmsg
+        ))
 
         return True
 
@@ -36,21 +38,25 @@ def irc_public (client, hostmask, channel, message):
     
     if message.startswith('!remind'):
         _, target, msg = message.split(' ', 2)
-        dmsg, remindmsg = msg.split(':', 1)
+        dmsg = msg.strip()
+        #dmsg, remindmsg = msg.split(':', 1)
 
-        remindmsg = remindmsg.strip()
         t = target.lower()
        
         if t == "me":
             t = nick.lower()
 
-        dtime, _, _, _, _ = pdt.nlp(dmsg)[0] # first matched date-like object
-        remindtime = time.mktime(dtime.timetuple())
-        #remindmsg = (msg[:spos] + msg[epos:]).strip()
+        matches = pdt.nlp(dmsg)
+        if matches != None:
+                dtime, flags, spos, epos, mtext = matches[0] # first matched date-like object
+                remindtime = time.mktime(dtime.timetuple())
+                remindmsg = (msg[:spos] + msg[epos:]).strip()
 
-        reminddelta = remindtime - time.time()
-        if schedule_reminder(client, (nick, t, channel, remindtime, remindmsg)):
-            save(client)
-            client.say(channel, "Okay, I'll remind {0} then!".format(t))
+                reminddelta = remindtime - time.time()
+                if schedule_reminder(client, (nick, t, channel, remindtime, remindmsg)):
+                    save(client)
+                    client.say(channel, "Okay, I'll remind {0} then!".format(t))
+                else:
+                    client.say(channel, "I'm not a time traveler!")
         else:
-            client.say(channel, "I'm not a time traveler!")
+                client.say(channel, "Sorry, I didn't catch that....")

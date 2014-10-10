@@ -7,6 +7,8 @@ import errno
 import yaml
 import logging
 
+logging.basicConfig(format="[%(asctime)s] %(message)s")
+
 logger = logging.getLogger("suikabot")
 logger.setLevel(logging.INFO)
 

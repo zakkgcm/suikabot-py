@@ -56,6 +56,61 @@ class DataWriter:
             with open(os.path.join(self.data_dir, fname), 'wb') as f:
                 pickle.dump(data, f) 
 
+class AliasMap:
+    def __init__ (self):
+        self.aliases = []
+
+    def find_alias_indices (self, alias_in, alias):
+        in_idx = None
+        needle_idx = None
+
+        for idx, group in enumerate(self.aliases):
+            if alias_in.lower() in group:
+                in_idx = idx
+            elif alias.lower() in group:
+                needle_idx = idx
+
+            # got what we came here for
+            if in_idx != None and needle_idx != None:
+                return (in_idx, needle_idx)
+
+        return (in_idx, needle_idx)
+    
+    def is_alias_of (self, alias_in, alias):
+        in_idx, needle_idx = self.find_alias_indices(alias_in, alias)
+        return in_idx != None and needle_idx != None and in_idx == needle_idx
+
+    def get_aliases (self, alias):
+        in_idx, needle_idx = self.find_alias_indices('', alias)
+        if needle_idx != None:
+            return self.aliases[needle_idx]
+
+        return [alias]
+
+    def add (self, alias_in, alias):
+        in_idx, needle_idx = self.find_alias_indices(alias_in, alias)
+        
+        # new alias already exists
+        if needle_idx != None:
+            return False
+
+        # the parent alias isn't there, make a new group
+        if in_idx == None:
+            self.aliases.append([alias_in.lower()])
+            in_idx = len(self.aliases) - 1
+
+        self.aliases[in_idx].append(alias.lower())
+        return True
+
+    def remove (self, alias):
+        # can optimize this by just calling remove() on every group
+        in_idx, needle_idx = self.find_alias_indices('', alias)
+        if needle_idx != None:
+            self.aliases[needle_idx].remove(alias)
+            return True
+
+        return False
+
 class AccessList:
     LEVEL_OWNER = 100
     LEVEL_OP = 10
@@ -124,6 +179,7 @@ class SuikaClient(irc.IRCClient):
     def __init__ (self, server):
         self.server = server
         self.access_list = None
+        self.alias_map = None
         self.plugins = None
 
         self.lineRate = 1
@@ -214,6 +270,7 @@ class SuikaClientFactory(ReconnectingClientFactory):
 
         # FIXME: refactor this as a "service" kind of design
         client.access_list = self.access_list
+        client.alias_map = self.alias_map
         client.plugins = self.plugins
 
         # required(?) by the api
@@ -230,6 +287,7 @@ class SuikaClientFactory(ReconnectingClientFactory):
         ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
 
 def connect_client (server, address, port=6667, password=None, nickname='', username=None, realname=None, ssl=False, **kwargs):
+    ''' Constructs and returns factory instance for a server after connecting it. '''
     factory = SuikaClientFactory()
     factory.set_info(server, nickname, username, realname, password)
 
@@ -255,16 +313,22 @@ def main ():
 
     data_writer = DataWriter(appdirs.user_data_dir('suikabot'))
 
+    alias_map = AliasMap()
+    alias_map.aliases = data_writer.get('aliases.db')
+
     plugins = PluginLoader('plugins')
     plugins.data_writer = data_writer
     plugins.load()
 
+    # connection logic
     for server, opts in serverlist.viewitems():
+        # clump the options together and let connect unpack w/ defaults
         opts.update(userinfo)
         factory = connect_client(server, **opts)
 
         # dependency inject
         factory.access_list = access_list
+        factory.alias_map = alias_map
         factory.plugins = plugins
 
         clients[server] = factory
@@ -275,6 +339,7 @@ def main ():
         
         # save config files
         configuration.save('accesslist', access_list.access_map)
+        data_writer.add('aliases.db', alias_map.aliases)
         
     reactor.addSystemEventTrigger('before', 'shutdown', shutdown)
 

@@ -15,7 +15,10 @@ class Laters (defaultdict):
         return self[target.lower()]
 
     def remove (self, target):
-        del self[target.lower()]
+        try:
+            del self[target.lower()]
+        except KeyError:
+            pass
 
     def limitcheck (self, target, user):
         return len([l for l in self.get(target) if l[0].lower() == user.lower()]) < 3
@@ -35,9 +38,12 @@ def client_connected (client):
 def irc_public (client, hostmask, channel, message):
     nick, user, host = util.ircmask_split(hostmask)
 
+    target = nick.lower()
+
     # check for saved laters first
-    if laters.has(nick):
-        lats = laters.get(nick)
+    aliases = client.alias_map.get_aliases(target)
+    if (True in [laters.has(x) for x in aliases]):
+        lats = [l for al in [laters.get(y) for y in aliases] for l in al] # literal magic
         for l in lats:
             sender, msg, t = l
        
@@ -47,7 +53,11 @@ def irc_public (client, hostmask, channel, message):
                 nick, humanize.naturaltime(t), sender, msg
             ))
 
-        laters.remove(nick)
+        # clear out the passed messages
+        for alias in aliases:
+            laters.remove(alias)
+
+        # save to disk
         laters.commit()
     
     # process commands

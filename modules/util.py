@@ -7,6 +7,10 @@ import errno
 import yaml
 import logging
 
+from twisted.words.protocols.irc import stripFormatting
+from twisted.words.protocols.irc import assembleFormattedText
+from twisted.words.protocols.irc import attributes as ircFormatting
+
 logging.basicConfig(format="[%(asctime)s] %(message)s")
 
 logger = logging.getLogger("suikabot")

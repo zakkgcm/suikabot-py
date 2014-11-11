@@ -67,7 +67,7 @@ class AliasMap:
         for idx, group in enumerate(self.aliases):
             if alias_in.lower() in group:
                 in_idx = idx
-            elif alias.lower() in group:
+            if alias.lower() in group:
                 needle_idx = idx
 
             # got what we came here for
@@ -88,6 +88,9 @@ class AliasMap:
         return [alias]
 
     def add (self, alias_in, alias):
+        if alias_in.strip() == '' or alias.strip() == '':
+	        return False
+
         in_idx, needle_idx = self.find_alias_indices(alias_in, alias)
         
         # new alias already exists

@@ -32,7 +32,7 @@ class Laters (defaultdict):
         
 laters = Laters(list)
 
-def client_connected (client):
+def init ():
     laters.load()
 
 def irc_public (client, hostmask, channel, message):
@@ -66,12 +66,12 @@ def irc_public (client, hostmask, channel, message):
         
         if cmd in ['tell', 'remind']:
             t = target.lower()
-            if t in ['xpc', 'xpcybic', 'xpcynic', 'xpcyphone', 'xpcdroid']:
-                client.say(channel, "Shhh!!! You know xpc doesn't like that!")
+            #if t in ['xpc', 'xpcybic', 'xpcynic', 'xpcyphone', 'xpcdroid']:
+            #    client.say(channel, "Shhh!!! You know xpc doesn't like that!")
+            #else:
+            if laters.limitcheck(target, nick):
+                laters.add(target, nick, msg)
+                client.say(channel, "Okay, I'll remind {0} later!".format(target))
+                laters.commit()
             else:
-                if laters.limitcheck(target, nick):
-                    laters.add(target, nick, msg)
-                    client.say(channel, "Okay, I'll remind {0} later!".format(target))
-                    laters.commit()
-                else:
-                    client.say(channel, "You already left {0} too many reminders!".format(target))
+                client.say(channel, "You already left {0} too many reminders!".format(target))

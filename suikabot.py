@@ -137,11 +137,17 @@ class AccessList:
 
         return False
 
+# FIXME: wtf is this shit
+class Scheduler:
+    def schedule (self, delay, callback, *args):
+        reactor.callLater(delay, callback, *args)
+
 class PluginLoader:
     def __init__ (self, plugin_dir='.'):
         self.plugins = {}
         self.plugin_dir = plugin_dir
         self.data_writer = None
+        self.services = {}
 
     def load (self):
         plugin_files = os.listdir(self.plugin_dir)
@@ -157,6 +163,7 @@ class PluginLoader:
                 self.plugins[name] = mod
 
                 mod.data_writer = self.data_writer # FIXME: magic global variable is ugly
+                mod.services = self.services
                 mod.init()
  
                 util.logger.info("Loaded module {0} from {1}".format(name, self.plugin_dir))
@@ -206,6 +213,8 @@ class SuikaClient(irc.IRCClient):
 
     def connectionMade(self):
         util.logger.info("Connected to server {0}.".format(self.server))
+
+        self.services['clients'][self.server] = self
         self.dispatch_to_plugins("client_connected")
 
         irc.IRCClient.connectionMade(self)
@@ -276,6 +285,8 @@ class SuikaClientFactory(ReconnectingClientFactory):
         client.alias_map = self.alias_map
         client.plugins = self.plugins
 
+        client.services = self.services
+
         # required(?) by the api
         client.factory = self
         
@@ -319,8 +330,13 @@ def main ():
     alias_map = AliasMap()
     alias_map.aliases = data_writer.get('aliases.db')
 
+    services = {}
+    services['clients'] = {}
+    services['scheduler'] = Scheduler()
+
     plugins = PluginLoader('plugins')
     plugins.data_writer = data_writer
+    plugins.services = services
     plugins.load()
 
     # connection logic
@@ -333,6 +349,7 @@ def main ():
         factory.access_list = access_list
         factory.alias_map = alias_map
         factory.plugins = plugins
+        factory.services = services
 
         clients[server] = factory
 

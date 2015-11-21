@@ -2,6 +2,7 @@ import time
 import datetime
 import humanize
 import parsedatetime
+import random
 
 from modules import util
 from collections import defaultdict
@@ -27,11 +28,12 @@ def save (client):
 
 def schedule_reminder (client, reminder):
     nick, t, channel, remindtime, remindmsg = reminder
+    dtime = datetime.datetime.fromtimestamp(remindtime) + datetime.timedelta(microseconds=999999)
     reminddelta = remindtime - time.time()
     
-    if reminddelta > 0: # the future
-        client.schedule(reminddelta, client.say, channel, "{0}: Sent {1}: <{2}> {3}".format(
-            t, humanize.naturaltime(reminddelta), nick, remindmsg
+    if reminddelta > 0: # only in the future
+        client.schedule(reminddelta, client.msg, channel, "{0}: Sent {1}: <{2}> {3}".format(
+            t, humanize.naturaltime(dtime - datetime.datetime.now()), nick, remindmsg
         ))
 
         return True
@@ -54,16 +56,20 @@ def irc_public (client, hostmask, channel, message):
         matches = pdt.nlp(dmsg)
         if matches != None:
                 dtime, flags, spos, epos, mtext = matches[0] # first matched date-like object
+
+                # convert into unix timestamp FIXME: probably blows up when timezone/DST
                 remindtime = time.mktime(dtime.timetuple())
                 remindmsg = (msg[:spos] + msg[epos:]).strip()
 
-                reminddelta = remindtime - time.time()
+                if remindmsg in ['oven', 'stove', 'microwave']:
+                    remindmsg = "BEEP" * random.randint(5, 8)
+
                 reminder = (nick, t, channel, remindtime, remindmsg)
                 if schedule_reminder(client, reminder):
                     reminders[client.server].append(reminder)
                     save(client)
-                    client.say(channel, "Okay, I'll remind {0} then!".format(t))
+                    client.msg(channel, "Okay, I'll remind {0} {1}!".format(t, humanize.naturaltime(dtime + datetime.timedelta(microseconds=999999))))
                 else:
-                    client.say(channel, "I'm not a time traveler!")
+                    client.msg(channel, "I'm not a time traveler!")
         else:
-                client.say(channel, "Sorry, I didn't catch that....")
+                client.msg(channel, "Sorry, I didn't catch that....")

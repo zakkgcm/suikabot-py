@@ -21,7 +21,8 @@ command_desc = [
 ]
 
 command_nouns = [
-    'sake'
+    'sake',
+    'tea'
 ]
 
 

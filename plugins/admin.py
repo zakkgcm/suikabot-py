@@ -18,8 +18,13 @@ def irc_public (client, hostmask, channel, message):
                 client.leave(channel)
             
             if cmd == '!reload':
-                client.plugins.reload()
-                client.say(channel, 'Plugins Reloaded!')
+                errs = client.plugins.reload()
+                # HMMMMMMMMMMMMM something might need this, breaks reminders atm
+                #client.dispatch_to_plugins("client_connected")
+                errstring = '{0} Error(s)'.format(len(errs))
+                if errs: errstring += ' | ' + ', '.join(['{0}({2}): {1}'.format(p, e, l) for p, e, l in errs[:2]])
+
+                client.say(channel, 'Plugins Reloaded! ({0})'.format(errstring))
     
     if message.startswith('!alias'):
         message = util.stripFormatting(message)

@@ -21,7 +21,7 @@ class Laters (defaultdict):
             pass
 
     def limitcheck (self, target, user):
-        return len([l for l in self.get(target) if l[0].lower() == user.lower()]) < 3
+        return len([l for l in self.get(target) if l[0].lower() == user.lower()]) < 6
 
     def load (self):
         self.clear()
@@ -35,7 +35,7 @@ laters = Laters(list)
 def init ():
     laters.load()
 
-def irc_public (client, hostmask, channel, message):
+def process_later (client, hostmask, channel, message):
     nick, user, host = util.ircmask_split(hostmask)
 
     target = nick.lower()
@@ -49,7 +49,7 @@ def irc_public (client, hostmask, channel, message):
        
             t = time.time() - t
 
-            client.say(channel, "{0}: Sent {1}: <{2}> {3}".format(
+            client.msg(channel, "{0}: Sent {1}: <{2}> {3}".format(
                 nick, humanize.naturaltime(t), sender, msg
             ))
 
@@ -66,13 +66,24 @@ def irc_public (client, hostmask, channel, message):
         
         if cmd in ['tell', 'remind']:
             t = target.lower()
+
             #if t in ['xpc', 'xpcybic', 'xpcynic', 'xpcyphone', 'xpcdroid']:
             #    client.say(channel, "Shhh!!! You know xpc doesn't like that!")
             #else:
+            if t == 'me':
+                target = nick.lower()
+
             if laters.limitcheck(target, nick):
                 laters.add(target, nick, msg)
                 #client.say(channel, "Okay, I'll remind {0} later!".format(target))
                 client.say(channel, services['phrases'].format('success', "I'll remind {0} later!".format(target)))
                 laters.commit()
             else:
-                client.say(channel, "You already left {0} too many reminders!".format(target))
+                client.msg(channel, "You already left {0} too many reminders!".format(target))
+
+def irc_public (client, hostmask, channel, message):
+    process_later(client, hostmask, channel, message)
+
+def irc_private (client, hostmask, channel, message):
+    nick, user, host = util.ircmask_split(hostmask)
+    process_later(client, hostmask, nick, message)

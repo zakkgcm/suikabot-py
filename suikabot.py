@@ -7,6 +7,7 @@ import imp
 import re
 import json
 import errno
+import traceback
 
 import threading
 import pickle
@@ -154,6 +155,8 @@ class PluginLoader:
         #suffixes = [x[0] for x in imp.get_suffixes()]
         suffixes = ['.py']
 
+        errors = []
+
         for plugin_file in plugin_files:
             name, suffix = os.path.splitext(plugin_file)
             if suffix not in suffixes:
@@ -164,17 +167,27 @@ class PluginLoader:
 
                 mod.data_writer = self.data_writer # FIXME: magic global variable is ugly
                 mod.services = self.services
-                mod.init()
+            
+                # init if we can    
+                if hasattr(mod, 'init'):
+                    mod.init()
+                else:
+                    util.logger.warning('No init defined for module {0}'.format(name))
  
-                util.logger.info("Loaded module {0} from {1}".format(name, self.plugin_dir))
-            except ImportError as e:
-                util.logger.error("Couldn't load module {0}! {1}".format(plugin_file, e))
-            except AttributeError:
-                util.logger.warning("No init defined for module {0}".format(name)) # FIXME: handle just the init error
+                util.logger.info('Loaded module {0} from {1}'.format(name, self.plugin_dir))
+
+            # general module loading problems
+            except Exception as e:
+                util.logger.error('Exception while loading module {0}! {1}'.format(plugin_file, e))
+                #FIXME: this is wrong line number for whatever reason
+                errors.append((plugin_file, type(e).__name__, sys.exc_info()[-1].tb_lineno))
+        
+        print errors
+        return errors
 
     def reload (self):
         self.plugins = {}
-        self.load()
+        return self.load()
 
     def get (self):
         return self.plugins
@@ -233,7 +246,14 @@ class SuikaClient(irc.IRCClient):
 
     # TODO: implement all of them
     def privmsg (self, *args):
-        self.dispatch_to_plugins('irc_public', *args)
+        if args[1] == self.nickname:
+            # rearrange query parameters, channel = sender instead of ourselves
+            # TODO: add some way for plugins to easily filter priv/pub messages
+            args = list(args)
+            args[1], _, _ = util.ircmask_split(args[0])
+            self.dispatch_to_plugins('irc_public', *args)
+        else: 
+            self.dispatch_to_plugins('irc_public', *args)
 
     def noticed (self, *args):
         self.dispatch_to_plugins('irc_notice', *args)

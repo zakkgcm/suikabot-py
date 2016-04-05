@@ -14,7 +14,7 @@ import pickle
 import appdirs
 import ssl
 
-from modules import util
+from modules import util, filters
 
 from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol
@@ -220,6 +220,12 @@ class SuikaClient(irc.IRCClient):
 
         irc.IRCClient.connectionMade(self)
 
+    def say (self, channel, message, length=None):
+        for s in self.services['outputFilters']:
+            message = s.transform(message)
+
+        irc.IRCClient.say(self, channel, message, length)
+
     # the rest of these are convenience methods inherited from Twisted
     # each is forwarded to plugins
     # some may have internal tracking logic
@@ -335,6 +341,7 @@ def main ():
     services['clients'] = {}
     services['scheduler'] = Scheduler()
     services['phrases'] = util.PhraseMap()
+    services['outputFilters'] = [filters.TrollOutputFilter()]
 
     plugins = PluginLoader('plugins')
     plugins.data_writer = data_writer

@@ -191,6 +191,7 @@ class SuikaClient(irc.IRCClient):
         self.access_list = None
         self.alias_map = None
         self.plugins = None
+        self.services = {};
 
         self.lineRate = 1
 
@@ -333,6 +334,7 @@ def main ():
     services = {}
     services['clients'] = {}
     services['scheduler'] = Scheduler()
+    services['phrases'] = util.PhraseMap()
 
     plugins = PluginLoader('plugins')
     plugins.data_writer = data_writer

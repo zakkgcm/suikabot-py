@@ -2,6 +2,7 @@ import os
 import re
 import sys
 
+import random
 import appdirs
 import errno
 import yaml
@@ -65,3 +66,16 @@ class Config:
                 return yaml.dump(data, f)
         except IOError as e:
             logger.error("Couldn't write config file {0}! {1}".format(fname, e))
+
+class PhraseMap:
+    def __init__ (self):
+        self.phrases = {
+            'success': ['Success! {0}', 'Okay, {0}', '*hic* Sure, {0}', 'Yes. {0}', 'Absolutely! {0}', 'Of course,  {0}']
+        }
+
+    def get (self, category):
+        return random.choice(self.phrases[category])        
+
+    def format (self, category, *args):
+        return self.get(category).format(*args)
+

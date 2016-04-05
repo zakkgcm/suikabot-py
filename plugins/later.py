@@ -71,7 +71,8 @@ def irc_public (client, hostmask, channel, message):
             #else:
             if laters.limitcheck(target, nick):
                 laters.add(target, nick, msg)
-                client.say(channel, "Okay, I'll remind {0} later!".format(target))
+                #client.say(channel, "Okay, I'll remind {0} later!".format(target))
+                client.say(channel, services['phrases'].format('success', "I'll remind {0} later!".format(target)))
                 laters.commit()
             else:
                 client.say(channel, "You already left {0} too many reminders!".format(target))

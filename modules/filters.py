@@ -4,32 +4,32 @@ import datetime
 
 class TrollOutputFilter:
     def __init__(self): 
-        self.currentTroll = 1
+        self.currentTroll = random.randint(0, 10)
         self.trollCounter = 0
         self.trolls = [
             #aradia
-            lambda x: x.translate(string.maketrans('oO', '00')),
+            { 'prefix': '', 'replace': lambda x: x.translate(string.maketrans('oo', '00')) },
             #terezi
-            lambda x: x.upper().translate(string.maketrans('AIE', '413')),
+            { 'prefix': '', 'replace': lambda x: x.upper().translate(string.maketrans('AIE', '413')) },
             #tavros
-            lambda x: x.title().swapcase(),
+            { 'prefix': '', 'replace': lambda x: x.title().swapcase() },
             #sollux
-            lambda x: x.replace('s', '2').replace('S', '2').replace('i', 'ii').replace('I', 'II'),
+            { 'prefix': '', 'replace': lambda x: x.replace('s', '2').replace('S', '2').replace('i', 'ii').replace('I', 'II') },
             #karkat
-            lambda x: x.upper(),
+            { 'prefix': '', 'replace': lambda x: x.upper() },
             #nepeta
-            lambda x: x.replace('ee', '33').replace('EE', '33'),
+            { 'prefix': ':33 <', 'replace': lambda x: x.replace('ee', '33').replace('EE', '33') },
             #kanaya
-            lambda x: x.title(),
+            { 'prefix': '', 'replace': lambda x: x.capitalize() },
             #vriska
-            lambda x: x.translate(string.maketrans('bB', '88')).replace('ate', '8'),
+            { 'prefix': '', 'replace': lambda x: x.translate(string.maketrans('bB', '88')).replace('ate', '8') },
             #equius
-            lambda x: 'D -->' + x.translate(string.maketrans('xX', '%%')),
+            { 'prefix': 'D -->', 'replace': lambda x: x.translate(string.maketrans('xX', '%%')) },
             #gamzee TODO need a full func
             #eridan
-            lambda x: x.replace('w', 'ww').replace('v', 'vv').replace('W', 'WW').replace('V', 'VV'),
+            { 'prefix': '', 'replace': lambda x: x.replace('w', 'ww').replace('v', 'vv').replace('W', 'WW').replace('V', 'VV') },
             #feferi
-            lambda x: x.replace('h', ')(').replace('H', ')(').replace('E', '-E'),
+            { 'prefix': '', 'replace': lambda x: x.replace('h', ')(').replace('H', ')(').replace('E', '-E') },
         ]
 
     def transform(self, message):
@@ -44,8 +44,8 @@ class TrollOutputFilter:
         
         def trollUnlessURL(x):
             if not x.startswith(('http://', 'https://', 'ftp://')):
-                return self.trolls[self.currentTroll](x)
+                return self.trolls[self.currentTroll]['replace'](x)
             
             return x
         
-        return ' '.join(map(trollUnlessURL, message.split()))
+        return self.trolls[self.currentTroll]['prefix'] + ' '.join(map(trollUnlessURL, message.split()))

@@ -3,12 +3,14 @@ import datetime
 import humanize
 import parsedatetime
 import random
+import re
 
 from modules import util
 from collections import defaultdict
 
 reminders = defaultdict(list)
 pdt = parsedatetime.Calendar()
+linkscrubber = re.compile(r'\bhttps?:\/\/.+?\s', re.I)
 
 def init ():
     global reminders # FIXME: PUKE
@@ -20,7 +22,9 @@ def client_connected (client):
 
     # purge reminders that have passed
     # FIXME: be more intelligent about this
-    reminders[client.server] = [ r for r in reminders[client.server] if schedule_reminder(client, r) ]
+    if client.server in reminders:
+        reminders[client.server] = [ r for r in reminders[client.server] if schedule_reminder(client, r) ]
+
     save(client)
 
 def save (client):
@@ -32,7 +36,7 @@ def schedule_reminder (client, reminder):
     reminddelta = remindtime - time.time()
     
     if reminddelta > 0: # only in the future
-        client.schedule(reminddelta, client.msg, channel, "{0}: Sent {1}: <{2}> {3}".format(
+        client.schedule(reminddelta, client.say, channel, "{0}: Sent {1}: <{2}> {3}".format(
             t, humanize.naturaltime(dtime - datetime.datetime.now()), nick, remindmsg
         ))
 
@@ -53,7 +57,7 @@ def irc_public (client, hostmask, channel, message):
         if t == "me":
             t = nick.lower()
 
-        matches = pdt.nlp(dmsg)
+        matches = pdt.nlp(' '.join([x for x in dmsg.split() if not x.startswith('http')]))
         if matches != None:
                 dtime, flags, spos, epos, mtext = matches[0] # first matched date-like object
 
@@ -68,8 +72,9 @@ def irc_public (client, hostmask, channel, message):
                 if schedule_reminder(client, reminder):
                     reminders[client.server].append(reminder)
                     save(client)
-                    client.msg(channel, "Okay, I'll remind {0} {1}!".format(t, humanize.naturaltime(dtime + datetime.timedelta(microseconds=999999))))
+                    client.say(channel, services['phrases'].format('success', "I'll remind {0} {1}!".format(t, humanize.naturaltime(dtime + datetime.timedelta(microseconds=999999)))))
+                    #client.msg(channel, "Okay, I'll remind {0} {1}!".format(t, humanize.naturaltime(dtime + datetime.timedelta(microseconds=999999))))
                 else:
-                    client.msg(channel, "I'm not a time traveler!")
+                    client.say(channel, "I'm not a time traveler!")
         else:
-                client.msg(channel, "Sorry, I didn't catch that....")
+                client.say(channel, "Sorry, I didn't catch that....")

@@ -43,13 +43,17 @@ def process_later (client, hostmask, channel, message):
     # check for saved laters first
     aliases = client.alias_map.get_aliases(target)
     if (True in [laters.has(x) for x in aliases]):
-        lats = [l for al in [laters.get(y) for y in aliases] for l in al] # literal magic
+        #lats = [l for al in [laters.get(y) for y in aliases] for l in al] # literal magic
+        lats = []
+        for y in aliases:
+            lats += laters.get(y)
+
         for l in lats:
             sender, msg, t = l
        
             t = time.time() - t
 
-            client.msg(channel, "{0}: Sent {1}: <{2}> {3}".format(
+            client.say(channel, "{0}: Sent {1}: <{2}> {3}".format(
                 nick, humanize.naturaltime(t), sender, msg
             ))
 
@@ -79,7 +83,7 @@ def process_later (client, hostmask, channel, message):
                 client.say(channel, services['phrases'].format('success', "I'll remind {0} later!".format(target)))
                 laters.commit()
             else:
-                client.msg(channel, "You already left {0} too many reminders!".format(target))
+                client.say(channel, "You already left {0} too many reminders!".format(target))
 
 def irc_public (client, hostmask, channel, message):
     process_later(client, hostmask, channel, message)

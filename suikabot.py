@@ -46,6 +46,8 @@ class DataWriter:
                 return data
         except IOError:
             util.logger.warning("Tried to load nonexistant data file {0}", fname)
+        except EOFError:
+            util.logger.warning("Loaded empty database file for {0}", fname)
 
         return []
 
@@ -355,7 +357,7 @@ def main ():
     data_writer = DataWriter(appdirs.user_data_dir('suikabot'))
 
     alias_map = AliasMap()
-    alias_map.aliases = data_writer.get('aliases.db')
+    alias_map.aliases = data_writer.get('aliases.db') or []
 
     services = {}
     services['clients'] = {}
@@ -387,6 +389,8 @@ def main ():
         util.logger.info("Shutting down...")
         
         # save config files
+        configuration.save('userinfo', userinfo)
+        configuration.save('servers', serverlist)
         configuration.save('accesslist', access_list.access_map)
         data_writer.add('aliases.db', alias_map.aliases)
         

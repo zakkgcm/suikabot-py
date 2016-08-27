@@ -45,9 +45,9 @@ class DataWriter:
                 data = pickle.load(f)
                 return data
         except IOError:
-            util.logger.warning("Tried to load nonexistant data file {0}", fname)
+            util.logger.warning("Tried to load nonexistent data file {0}".format(fname))
         except EOFError:
-            util.logger.warning("Loaded empty database file for {0}", fname)
+            util.logger.warning("Loaded empty database file for {0}".format(fname))
 
         return []
 

@@ -12,13 +12,10 @@ from twisted.words.protocols.irc import stripFormatting
 from twisted.words.protocols.irc import assembleFormattedText
 from twisted.words.protocols.irc import attributes as ircFormatting
 
-logging.basicConfig(format="[%(asctime)s] %(message)s")
+logging.basicConfig(format="[%(levelname)s] [%(asctime)s]  %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
 logger = logging.getLogger("suikabot")
 logger.setLevel(logging.INFO)
-
-shandle = logging.StreamHandler(sys.stdout)
-logger.addHandler(shandle)
  
 def mkdir(dirname):
     try:
@@ -70,7 +67,7 @@ class Config:
 class PhraseMap:
     def __init__ (self):
         self.phrases = {
-            'success': ['Success! {0}', 'Okay, {0}', '*hic* Sure, {0}', 'Yes. {0}', 'Absolutely! {0}', 'Of course,  {0}']
+            'success': ['Success! {0}', 'Okay, {0}', '*hic* Sure, {0}', 'Yes. {0}', 'Absolutely! {0}', 'Of course, {0}']
         }
 
     def get (self, category):

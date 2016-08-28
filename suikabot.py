@@ -15,6 +15,8 @@ import pickle
 import appdirs
 import ssl
 
+import warnings
+
 from modules import util, filters
 
 from twisted.words.protocols import irc
@@ -164,8 +166,10 @@ class PluginLoader:
             if suffix not in suffixes:
                 continue
             try:
-                mod = imp.load_source('suikabot.plugin.{0}'.format(name), os.path.join(self.plugin_dir, plugin_file))
-                self.plugins[name] = mod
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    mod = imp.load_source('suikabot.plugin.{0}'.format(name), os.path.join(self.plugin_dir, plugin_file))
+                    self.plugins[name] = mod
 
                 mod.data_writer = self.data_writer # FIXME: magic global variable is ugly
                 mod.services = self.services
